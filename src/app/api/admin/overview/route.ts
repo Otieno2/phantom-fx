@@ -2,9 +2,8 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { json, route } from "@/lib/http";
 import { round2 } from "@/lib/trading/math";
-import { priceFeed } from "@/server/prices";
+import { feedFor, feeds } from "@/server/prices";
 import { positionsWithPnl } from "@/server/trading";
-
 export const GET = route(async () => {
   await requireAdmin();
   const since = new Date(Date.now() - 24 * 3600 * 1000);
@@ -24,7 +23,9 @@ export const GET = route(async () => {
         _count: true,
       }),
     ]);
-  const open = await positionsWithPnl(openLive, priceFeed.quotes());
+  // Live exposure is marked by the live feed only, on its display surface.
+  const live = feedFor("LIVE");
+  const open = await positionsWithPnl(openLive, live.displayQuotes());
   const floating = open.reduce((s, p) => s + p.profit, 0);
   return json({
     users,
@@ -39,6 +40,9 @@ export const GET = route(async () => {
     // The house is the counterparty on live trades (B-book): client losses are broker revenue.
     brokerPnl24h: round2(-(closedLive24h._sum.profit ?? 0) + (closedLive24h._sum.commission ?? 0)),
     trades24h: closedLive24h._count,
-    feed: { mode: priceFeed.mode, stale: priceFeed.isStale(), lastUpdate: priceFeed.lastUpdate },
+    // Both slots, each with its own state machine: the panel must be able to see
+    // a degraded live feed next to a healthy demo tape, and say which is which.
+    feeds: feeds().instances().map((feed) => feed.status()),
+    feedWarnings: feeds().warnings,
   });
 });

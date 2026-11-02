@@ -21,6 +21,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const { confirm: _confirm, ...body } = form;
       void _confirm;
       const res = await api<{ role?: string }>(`/api/auth/${mode}`, { body });
+      // Small delay to ensure cookie is set before redirect
+      await new Promise(resolve => setTimeout(resolve, 100));
       router.push(res.role === "ADMIN" ? "/admin" : "/trade");
       router.refresh();
     } catch (err) {

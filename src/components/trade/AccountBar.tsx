@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { pnlClass, usd } from "@/lib/client/format";
+import type { FeedView } from "@/lib/client/usePrices";
 import type { AccountSummary, Metrics } from "./types";
 
 export function AccountBar({
@@ -17,10 +18,24 @@ export function AccountBar({
   metrics?: Metrics;
   onSwitch: (id: string) => void;
   onResetDemo: () => void;
-  feed: { mode: string; marketOpen: boolean; connected: boolean };
+  feed: FeedView;
 }) {
   const active = accounts.find((a) => a.id === activeId);
   const level = metrics?.marginLevel;
+  const onLiveFeed = feed.feed === "LIVE";
+  // Degraded and paused are different promises: one still protects what is
+  // open, the other has stopped, so they must not share a label.
+  const feedLabel = !feed.connected
+    ? "Connecting…"
+    : feed.state === "misconfigured"
+      ? "Feed misconfigured"
+      : feed.paused
+        ? `${onLiveFeed ? "Live" : "Demo"} feed paused`
+        : feed.degraded
+          ? `${onLiveFeed ? "Live" : "Demo"} prices stale · open trades still managed`
+          : !feed.marketOpen
+            ? "Market closed"
+            : `${feed.mode === "simulated" ? "Simulated" : "Real"} prices · ${feed.mode}${feed.simulatedMarks ? " (live account, simulated marks)" : ""}`;
   const stat = (label: string, value: React.ReactNode, cls = "text-white") => (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
@@ -57,9 +72,26 @@ export function AccountBar({
         {active?.type === "LIVE" && (
           <Link href="/wallet" className="btn-primary px-3 py-1 text-xs">Deposit</Link>
         )}
-        <span className="flex items-center gap-1.5 text-slate-400">
-          <span className={`h-2 w-2 rounded-full ${feed.connected ? (feed.marketOpen ? "bg-up" : "bg-yellow-400") : "bg-down"}`} />
-          {feed.connected ? (feed.marketOpen ? `${feed.mode === "simulated" ? "Simulated" : "Live"} prices` : "Market closed") : "Connecting…"}
+        <span
+          className="flex items-center gap-1.5 text-slate-400"
+          title={feed.paused ? "This feed prices nothing right now — held positions are not being closed either" : feed.degraded ? feed.reason : undefined}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              !feed.connected
+                ? "bg-down"
+                : feed.paused
+                  ? "bg-down"
+                  : feed.degraded
+                    ? "bg-yellow-400"
+                    : feed.simulatedMarks
+                      ? "bg-yellow-400"
+                      : feed.marketOpen
+                        ? "bg-up"
+                        : "bg-yellow-400"
+            }`}
+          />
+          {feedLabel}
         </span>
       </div>
     </div>

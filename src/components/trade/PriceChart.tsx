@@ -20,7 +20,17 @@ interface Bar {
   close: number;
 }
 
-export function PriceChart({ symbol, digits, tick }: { symbol: string; digits: number; tick?: Tick }) {
+export function PriceChart({
+  symbol,
+  digits,
+  tick,
+  accountId,
+}: {
+  symbol: string;
+  digits: number;
+  tick?: Tick;
+  accountId?: string;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -61,7 +71,8 @@ export function PriceChart({ symbol, digits, tick }: { symbol: string; digits: n
   useEffect(() => {
     let cancelled = false;
     const key = `${symbol}:${tf}`;
-    fetch(`/api/candles?symbol=${symbol}&tf=${tf}`)
+    const account = accountId ? `&account=${encodeURIComponent(accountId)}` : "";
+    fetch(`/api/candles?symbol=${symbol}&tf=${tf}${account}`)
       .then((r) => r.json())
       .then((d: { candles: Bar[] }) => {
         if (cancelled || !series.current) return;
@@ -74,7 +85,7 @@ export function PriceChart({ symbol, digits, tick }: { symbol: string; digits: n
     return () => {
       cancelled = true;
     };
-  }, [symbol, tf]);
+  }, [symbol, tf, accountId]);
 
   useEffect(() => {
     if (!tick || !series.current || loading) return;

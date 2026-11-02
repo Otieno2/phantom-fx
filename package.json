@@ -11,6 +11,8 @@
     "test": "vitest run",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "probe:yahoo": "node src/server/scripts/yahoo-probe.mjs",
+    "probe:yahoo:full": "node src/server/scripts/yahoo-probe.mjs --full",
     "setup": "prisma db push && tsx prisma/seed.ts"
   },
   "dependencies": {

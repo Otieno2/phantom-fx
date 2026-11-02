@@ -6,6 +6,46 @@ import { dateTime, digitsFor, pnlClass, price, signedUsd, usd } from "@/lib/clie
 
 type Tab = "overview" | "transactions" | "users" | "positions" | "instruments" | "audit";
 
+interface FeedStatus {
+  role: string;
+  purpose: string;
+  mode: string;
+  provider: string;
+  state: string;
+  started: boolean;
+  lastMarkAt: number;
+  failures: number;
+  stale: boolean;
+  /** Marks are old: held positions are still managed, new orders are refused. */
+  degraded: boolean;
+  /** Nothing executes. */
+  paused: boolean;
+  simulatedMarks: boolean;
+  reason: string;
+  steerable: boolean;
+  winRate: number | null;
+  trackedDemoPositions: number;
+  symbols: number;
+}
+
+/** Degraded and paused read differently: one still protects open trades. */
+function feedTone(f: FeedStatus): string {
+  if (f.paused) return "text-down";
+  if (f.degraded || f.simulatedMarks) return "text-yellow-400";
+  if (f.state === "running") return "text-up";
+  return "text-slate-400";
+}
+
+function feedLabel(f: FeedStatus): string {
+  const flags = [
+    f.state !== "running" ? (f.reason ? `${f.state}: ${f.reason}` : f.state) : "",
+    f.degraded ? "stale marks — management only" : "",
+    f.simulatedMarks ? "SIMULATED live prices" : "",
+    f.steerable ? `win-rate steered (${Math.round((f.winRate ?? 0) * 100)}%)` : "",
+  ].filter(Boolean);
+  return `${f.mode}${flags.length ? ` · ${flags.join(" · ")}` : ""}`;
+}
+
 interface Overview {
   users: number;
   newUsers: number;
@@ -18,7 +58,8 @@ interface Overview {
   clientFloatingPnl: number;
   brokerPnl24h: number;
   trades24h: number;
-  feed: { mode: string; stale: boolean; lastUpdate: number };
+  feeds: FeedStatus[];
+  feedWarnings: string[];
 }
 
 function useToast() {
@@ -99,12 +140,23 @@ function OverviewTab() {
         <Stat label="Client floating P/L" value={signedUsd(o.clientFloatingPnl)} cls={pnlClass(o.clientFloatingPnl)} />
         <Stat label="Broker P/L (24h)" value={signedUsd(o.brokerPnl24h)} cls={pnlClass(o.brokerPnl24h)} />
         <Stat label="Live trades closed (24h)" value={o.trades24h} />
-        <Stat
-          label="Price feed"
-          value={`${o.feed.mode}${o.feed.stale ? " (stale)" : ""}`}
-          cls={o.feed.stale ? "text-down" : "text-up"}
-        />
+        {o.feeds.map((f) => (
+          <Stat
+            key={f.role}
+            label={`${f.purpose} accounts · ${f.role} feed`}
+            value={feedLabel(f)}
+            cls={feedTone(f)}
+          />
+        ))}
       </div>
+      {o.feedWarnings?.length > 0 && (
+        <div className="card space-y-1 p-4">
+          <div className="text-xs uppercase tracking-wide text-yellow-400">Feed configuration warnings</div>
+          {o.feedWarnings.map((w) => (
+            <p key={w} className="font-mono text-xs text-slate-300">{w}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

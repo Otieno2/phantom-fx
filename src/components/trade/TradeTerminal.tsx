@@ -11,10 +11,12 @@ import { Watchlist } from "./Watchlist";
 import type { AccountState, AccountSummary, InstrumentInfo } from "./types";
 
 export function TradeTerminal() {
-  const feed = usePrices();
   const [instruments, setInstruments] = useState<InstrumentInfo[]>([]);
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  // The active account selects the feed: demo reads the steered simulation,
+  // live reads the real provider.
+  const feed = usePrices(activeId || undefined);
   const [state, setState] = useState<AccountState | null>(null);
   const [symbol, setSymbol] = useState("EURUSD");
   const [toast, setToast] = useState<{ msg: string; error?: boolean } | null>(null);
@@ -68,11 +70,18 @@ export function TradeTerminal() {
 
   const instrument = instruments.find((i) => i.symbol === symbol) ?? instruments[0];
   const active = accounts.find((a) => a.id === activeId);
+  const who = feed.feed === "LIVE" ? "Live" : "Demo";
+  // Paused and degraded are not the same warning: in degraded the client's
+  // protective orders still run, and saying so is the whole point of the split.
   const disabled = !feed.marketOpen
     ? "The FX market is closed (opens Sunday 22:00 UTC)"
-    : active?.type === "LIVE" && (state?.metrics.balance ?? 0) <= 0 && (state?.positions.length ?? 0) === 0
-      ? "Your live account has no funds. Deposit from the Wallet to start trading."
-      : null;
+    : feed.paused
+      ? `${who} prices are unavailable (${feed.reason || "no trustworthy marks"}), trading is paused — open positions are not being closed either`
+      : feed.degraded
+        ? `${who} prices are stale (${feed.reason || "last mark is old"}) — new orders are refused, but stop-loss and take-profit on your open positions still run`
+        : active?.type === "LIVE" && (state?.metrics.balance ?? 0) <= 0 && (state?.positions.length ?? 0) === 0
+          ? "Your live account has no funds. Deposit from the Wallet to start trading."
+          : null;
 
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col">
@@ -90,7 +99,7 @@ export function TradeTerminal() {
         </aside>
         <section className="flex min-h-0 flex-col">
           <div className="min-h-[300px] flex-[3] border-b border-ink-700 bg-ink-900">
-            {instrument && <PriceChart symbol={instrument.symbol} digits={instrument.digits} tick={feed.ticks[instrument.symbol]} />}
+            {instrument && <PriceChart symbol={instrument.symbol} digits={instrument.digits} tick={feed.ticks[instrument.symbol]} accountId={activeId || undefined} />}
           </div>
           <div className="min-h-[200px] flex-[2] bg-ink-900">
             <PositionsPanel

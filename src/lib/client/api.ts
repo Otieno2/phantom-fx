@@ -12,6 +12,7 @@ export async function api<T = unknown>(url: string, init?: { method?: string; bo
     method: init?.method ?? (init?.body ? "POST" : "GET"),
     headers: init?.body ? { "Content-Type": "application/json" } : undefined,
     body: init?.body ? JSON.stringify(init.body) : undefined,
+    credentials: "same-origin",
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));

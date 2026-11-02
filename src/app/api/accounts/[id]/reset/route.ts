@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { HttpError, json, route } from "@/lib/http";
 import { demoBalance } from "@/server/accounts";
 import { withLock } from "@/server/lock";
+import { feedFor } from "@/server/prices";
 
 export const POST = route(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const user = await requireUser();
@@ -24,5 +25,7 @@ export const POST = route(async (_req: Request, ctx: { params: Promise<{ id: str
       await tx.account.update({ where: { id }, data: { balance } });
     }),
   );
+  // Only demo positions are ever registered for steering.
+  feedFor("DEMO").clearAccount(id);
   return json({ ok: true });
 });
